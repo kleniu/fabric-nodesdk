@@ -15,7 +15,7 @@ var options = {
     wallet_path: path.join(__dirname, './fabric/creds'),
     user_id: 'PeerAdmin',
     channel_id: 'mychannel',
-    chaincode_id: 'fabcar',
+    chaincode_id: 'testcc',
     network_url: 'grpc://localhost:7051',
 };
 
