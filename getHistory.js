@@ -48,7 +48,7 @@ Promise.resolve().then(() => {
     const request = {
         chaincodeId: options.chaincode_id,
         txId: transaction_id,
-        fcn: 'queryAsset',
+        fcn: 'listHistory',
         args: ['asset1']
     };
     return channel.queryByChaincode(request);

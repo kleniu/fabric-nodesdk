@@ -54,8 +54,8 @@ Promise.resolve().then(() => {
     var request = {
         targets: targets,
         chaincodeId: options.chaincode_id,
-        fcn: 'makeAsset',
-        args: ['asset1', '{value=2,color=\'red\'}'],
+        fcn: 'changeAsset',
+        args: ['asset1', '{value=3,color=\'blue\'}'],
         chainId: options.channel_id,
         txId: tx_id
     };

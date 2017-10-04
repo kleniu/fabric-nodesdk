@@ -1,38 +1,16 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing,
- * software distributed under the License is distributed on an
- * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
- * KIND, either express or implied.  See the License for the
- * specific language governing permissions and limitations
- * under the License.
- */
-
-/*
- * The sample smart contract for documentation topic:
- * Writing Your First Blockchain Application
+ * The test chaincode
  */
 
 package main
 
-/* Imports
- * 4 utility libraries for formatting, handling bytes, reading and writing JSON, and string manipulation
- * 2 specific Hyperledger Fabric specific libraries for Smart Contracts
- */
 import (
 	"bytes"
 	"encoding/json"
 	"fmt"
 	"strconv"
+	// "strings"
+	"time"
 
 	"github.com/hyperledger/fabric/core/chaincode/shim"
 	sc "github.com/hyperledger/fabric/protos/peer"
@@ -42,114 +20,112 @@ import (
 type SmartContract struct {
 }
 
-// Define the car structure, with 4 properties.  Structure tags are used by encoding/json library
-type Car struct {
-	Make   string `json:"make"`
-	Model  string `json:"model"`
-	Colour string `json:"colour"`
-	Owner  string `json:"owner"`
-}
+// Define asset structure
+//type Asset struct {
+//	Value  string `json:"make"`
+//	Color  string `json:"color"`
+//}
 
 /*
- * The Init method is called when the Smart Contract "fabcar" is instantiated by the blockchain network
+ * The Init method is called when the chaincode is instantiated by the blockchain network
  * Best practice is to have any Ledger initialization in separate function -- see initLedger()
  */
 func (s *SmartContract) Init(APIstub shim.ChaincodeStubInterface) sc.Response {
+	fmt.Println("Calling instantiate method.")
 	return shim.Success(nil)
 }
 
 /*
- * The Invoke method is called as a result of an application request to run the Smart Contract "fabcar"
+ * The Invoke method is called as a result of an application request to run the Smart Contract
  * The calling application program has also specified the particular smart contract function to be called, with arguments
  */
 func (s *SmartContract) Invoke(APIstub shim.ChaincodeStubInterface) sc.Response {
+	fmt.Println("Calling Invoke method.") 
 
 	// Retrieve the requested Smart Contract function and arguments
 	function, args := APIstub.GetFunctionAndParameters()
+	fmt.Println("Function name: " + function)
+
 	// Route to the appropriate handler function to interact with the ledger appropriately
-	if function == "queryCar" {
-		return s.queryCar(APIstub, args)
-	} else if function == "initLedger" {
-		return s.initLedger(APIstub)
-	} else if function == "createCar" {
-		return s.createCar(APIstub, args)
-	} else if function == "queryAllCars" {
-		return s.queryAllCars(APIstub)
-	} else if function == "changeCarOwner" {
-		return s.changeCarOwner(APIstub, args)
+	if function == "queryAsset" {
+		return s.queryAsset(APIstub, args)
+	} else if function == "makeAsset" {
+		return s.makeAsset(APIstub, args)
+	} else if function == "changeAsset" {
+		return s.changeAsset(APIstub, args)
+	} else if function == "deleteAsset" {
+		return s.deleteAsset(APIstub, args) 
+	} else if function == "listHistory" {
+		return s.listHistory(APIstub, args) 
 	}
 
 	return shim.Error("Invalid Smart Contract function name.")
 }
 
-func (s *SmartContract) queryCar(APIstub shim.ChaincodeStubInterface, args []string) sc.Response {
+func (s *SmartContract) queryAsset(APIstub shim.ChaincodeStubInterface, args []string) sc.Response {
 
 	if len(args) != 1 {
+		return shim.Error("Incorrect number of arguments. Expecting 1. Please provide KEY of the asset.")
+	}
+
+	valAsBytes, err := APIstub.GetState(args[0])
+	if err != nil {
+		fmt.Println("ERR in GetState. err.Error()=" + err.Error())
+		return shim.Error("ERR in GetState. err.Error()=" + err.Error())
+	} else if len(valAsBytes) == 0 {
+		fmt.Println("ERR the VAL is empty for KEY=" + args[0])
+		return shim.Error("ERR the VAL is empty for KEY=" + args[0])
+	}
+
+	fmt.Println("OK Retrived KEY: >" + args[0] + "< VAL: >" + string(valAsBytes[:]) + "<")
+	
+	return shim.Success(valAsBytes)
+}
+
+func (s *SmartContract) makeAsset(APIstub shim.ChaincodeStubInterface, args []string) sc.Response {
+
+	if len(args) != 2 {
+		return shim.Error("Incorrect number of arguments. Expecting 2. Please provide KEY and VAL of the asset.")	
+	}
+
+	aKeyAsStr        := args[0]
+	aValAsBytes, err := json.Marshal(args[1])
+
+	if err != nil {
+		fmt.Println("ERR in json.Marshal(" + args[1] + "). err.Error()=" + err.Error())
+		return shim.Error("ERR in json.Marshal(" + args[1] + "). err.Error()=" + err.Error())
+	}
+
+	APIstub.PutState(aKeyAsStr, aValAsBytes)
+	fmt.Println("Added KEY=" + aKeyAsStr + " VAL=" + string(aValAsBytes[:]))
+
+	return shim.Success(nil)
+}
+
+
+func (s *SmartContract) listHistory(APIstub shim.ChaincodeStubInterface, args []string) sc.Response {
+
+	if len(args) < 1 {
 		return shim.Error("Incorrect number of arguments. Expecting 1")
 	}
 
-	carAsBytes, _ := APIstub.GetState(args[0])
-	return shim.Success(carAsBytes)
-}
+	assetName := args[0]
 
-func (s *SmartContract) initLedger(APIstub shim.ChaincodeStubInterface) sc.Response {
-	cars := []Car{
-		Car{Make: "Toyota", Model: "Prius", Colour: "blue", Owner: "Tomoko"},
-		Car{Make: "Ford", Model: "Mustang", Colour: "red", Owner: "Brad"},
-		Car{Make: "Hyundai", Model: "Tucson", Colour: "green", Owner: "Jin Soo"},
-		Car{Make: "Volkswagen", Model: "Passat", Colour: "yellow", Owner: "Max"},
-		Car{Make: "Tesla", Model: "S", Colour: "black", Owner: "Adriana"},
-		Car{Make: "Peugeot", Model: "205", Colour: "purple", Owner: "Michel"},
-		Car{Make: "Chery", Model: "S22L", Colour: "white", Owner: "Aarav"},
-		Car{Make: "Fiat", Model: "Punto", Colour: "violet", Owner: "Pari"},
-		Car{Make: "Tata", Model: "Nano", Colour: "indigo", Owner: "Valeria"},
-		Car{Make: "Holden", Model: "Barina", Colour: "brown", Owner: "Shotaro"},
-	}
+	fmt.Printf("- start listHistory: %s\n", assetName)
 
-	i := 0
-	for i < len(cars) {
-		fmt.Println("i is ", i)
-		carAsBytes, _ := json.Marshal(cars[i])
-		APIstub.PutState("CAR"+strconv.Itoa(i), carAsBytes)
-		fmt.Println("Added", cars[i])
-		i = i + 1
-	}
-
-	return shim.Success(nil)
-}
-
-func (s *SmartContract) createCar(APIstub shim.ChaincodeStubInterface, args []string) sc.Response {
-
-	if len(args) != 5 {
-		return shim.Error("Incorrect number of arguments. Expecting 5")
-	}
-
-	var car = Car{Make: args[1], Model: args[2], Colour: args[3], Owner: args[4]}
-
-	carAsBytes, _ := json.Marshal(car)
-	APIstub.PutState(args[0], carAsBytes)
-
-	return shim.Success(nil)
-}
-
-func (s *SmartContract) queryAllCars(APIstub shim.ChaincodeStubInterface) sc.Response {
-
-	startKey := "CAR0"
-	endKey := "CAR999"
-
-	resultsIterator, err := APIstub.GetStateByRange(startKey, endKey)
+	resultsIterator, err := APIstub.GetHistoryForKey(assetName)
 	if err != nil {
 		return shim.Error(err.Error())
 	}
 	defer resultsIterator.Close()
 
-	// buffer is a JSON array containing QueryResults
+	// buffer is a JSON array containing historic values for the marble
 	var buffer bytes.Buffer
 	buffer.WriteString("[")
 
 	bArrayMemberAlreadyWritten := false
 	for resultsIterator.HasNext() {
-		queryResponse, err := resultsIterator.Next()
+		response, err := resultsIterator.Next()
 		if err != nil {
 			return shim.Error(err.Error())
 		}
@@ -157,41 +133,76 @@ func (s *SmartContract) queryAllCars(APIstub shim.ChaincodeStubInterface) sc.Res
 		if bArrayMemberAlreadyWritten == true {
 			buffer.WriteString(",")
 		}
-		buffer.WriteString("{\"Key\":")
+		buffer.WriteString("{\"TxId\":")
 		buffer.WriteString("\"")
-		buffer.WriteString(queryResponse.Key)
+		buffer.WriteString(response.TxId)
 		buffer.WriteString("\"")
 
-		buffer.WriteString(", \"Record\":")
-		// Record is a JSON object, so we write as-is
-		buffer.WriteString(string(queryResponse.Value))
+		buffer.WriteString(", \"Value\":")
+		// if it was a delete operation on given key, then we need to set the
+		//corresponding value null. Else, we will write the response.Value
+		//as-is (as the Value itself a JSON marble)
+		if response.IsDelete {
+			buffer.WriteString("null")
+		} else {
+			buffer.WriteString(string(response.Value))
+		}
+
+		buffer.WriteString(", \"Timestamp\":")
+		buffer.WriteString("\"")
+		buffer.WriteString(time.Unix(response.Timestamp.Seconds, int64(response.Timestamp.Nanos)).String())
+		buffer.WriteString("\"")
+
+		buffer.WriteString(", \"IsDelete\":")
+		buffer.WriteString("\"")
+		buffer.WriteString(strconv.FormatBool(response.IsDelete))
+		buffer.WriteString("\"")
+
 		buffer.WriteString("}")
 		bArrayMemberAlreadyWritten = true
 	}
 	buffer.WriteString("]")
 
-	fmt.Printf("- queryAllCars:\n%s\n", buffer.String())
+	fmt.Printf("- listHistory returning:\n%s\n", buffer.String())
 
 	return shim.Success(buffer.Bytes())
 }
 
-func (s *SmartContract) changeCarOwner(APIstub shim.ChaincodeStubInterface, args []string) sc.Response {
+func (s *SmartContract) changeAsset(APIstub shim.ChaincodeStubInterface, args []string) sc.Response {
 
 	if len(args) != 2 {
 		return shim.Error("Incorrect number of arguments. Expecting 2")
 	}
 
-	carAsBytes, _ := APIstub.GetState(args[0])
-	car := Car{}
+	aKeyAsStr        := args[0]
+	aValAsBytes, err := json.Marshal(args[1])
 
-	json.Unmarshal(carAsBytes, &car)
-	car.Owner = args[1]
+	if err != nil {
+		fmt.Println("ERR in json.Marshal(" + args[1] + "). err.Error()=" + err.Error())
+		return shim.Error("ERR in json.Marshal(" + args[1] + "). err.Error()=" + err.Error())
+	}
 
-	carAsBytes, _ = json.Marshal(car)
-	APIstub.PutState(args[0], carAsBytes)
+	APIstub.PutState(aKeyAsStr, aValAsBytes)
+	fmt.Println("Changed KEY=" + aKeyAsStr + " VAL=" + string(aValAsBytes[:]))
 
 	return shim.Success(nil)
 }
+
+
+func (s *SmartContract) deleteAsset(APIstub shim.ChaincodeStubInterface, args []string) sc.Response {
+
+	if len(args) != 1 {
+		return shim.Error("Incorrect number of arguments. Expecting 1")
+	}
+
+	aKeyAsStr        := args[0]
+
+	APIstub.DelState(aKeyAsStr)
+	fmt.Println("Deleted KEY=" + aKeyAsStr )
+
+	return shim.Success(nil)
+}
+
 
 // The main function is only relevant in unit test mode. Only included here for completeness.
 func main() {
