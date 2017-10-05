@@ -7,24 +7,60 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"encoding/hex"
 	"fmt"
 	"strconv"
-	// "strings"
+	"crypto/x509"
+	"encoding/pem"
 	"time"
+	"math/big"
 
 	"github.com/hyperledger/fabric/core/chaincode/shim"
 	sc "github.com/hyperledger/fabric/protos/peer"
+	mp "github.com/hyperledger/fabric/protos/msp"
+	"github.com/golang/protobuf/proto"
 )
 
 // Define the Smart Contract structure
 type SmartContract struct {
 }
 
-// Define asset structure
-//type Asset struct {
-//	Value  string `json:"make"`
-//	Color  string `json:"color"`
-//}
+func formatSerial(serial *big.Int) string {
+	b := serial.Bytes()
+	buf := make([]byte, 0, 3*len(b))
+	x := buf[1*len(b) : 3*len(b)]
+	hex.Encode(x, b)
+	for i := 0; i < len(x); i += 2 {
+		buf = append(buf, x[i], x[i+1], ':')
+	}
+	return string(buf[:len(buf)-1])
+}
+
+
+func parseCert(serializedID []byte) {
+	sId := &mp.SerializedIdentity{}
+	err := proto.Unmarshal(serializedID, sId)
+	if err != nil {
+		fmt.Println("Could not deserialize a SerializedIdentity, err %s", err)
+	}
+	// get the MSP name
+	fmt.Println("MSP: " + sId.Mspid)
+
+	bl, _ := pem.Decode(sId.IdBytes)
+	if bl == nil {
+		fmt.Println("Failed to decode PEM structure")
+	}
+
+	cert, err := x509.ParseCertificate(bl.Bytes)
+	if err != nil {
+		fmt.Println("Unable to parse certificate %s", err)
+	}
+	
+	// print the cert
+        fmt.Println("Cert SerialNumber: " + formatSerial(cert.SerialNumber) ) 
+        fmt.Println("Cert Subject CommonName :" + cert.Subject.CommonName)
+}
+
 
 /*
  * The Init method is called when the chaincode is instantiated by the blockchain network
@@ -32,6 +68,12 @@ type SmartContract struct {
  */
 func (s *SmartContract) Init(APIstub shim.ChaincodeStubInterface) sc.Response {
 	fmt.Println("Calling instantiate method.")
+
+	// method to just get the identity of the submitter of the transaction 
+
+	serializedID, _ := APIstub.GetCreator() 
+	parseCert(serializedID)
+
 	return shim.Success(nil)
 }
 
@@ -41,6 +83,9 @@ func (s *SmartContract) Init(APIstub shim.ChaincodeStubInterface) sc.Response {
  */
 func (s *SmartContract) Invoke(APIstub shim.ChaincodeStubInterface) sc.Response {
 	fmt.Println("Calling Invoke method.") 
+
+	serializedID, _ := APIstub.GetCreator() 
+	parseCert(serializedID)
 
 	// Retrieve the requested Smart Contract function and arguments
 	function, args := APIstub.GetFunctionAndParameters()
